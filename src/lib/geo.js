@@ -154,6 +154,19 @@ export function watchCompassHeading(callback) {
 }
 
 /**
+ * Calculate the bearing delta between device heading and turn bearing
+ * @param {number} deviceHeading - Current compass heading (0-360)
+ * @param {number} turnBearing - Absolute bearing of the turn (0-360)
+ * @returns {number} Bearing delta (-180 to 180)
+ */
+export function calculateBearingDelta(deviceHeading, turnBearing) {
+  let delta = turnBearing - deviceHeading;
+  while (delta > 180) delta -= 360;
+  while (delta < -180) delta += 360;
+  return delta;
+}
+
+/**
  * Find the closest point on a route to a given position
  * @param {[number, number]} position - [lng, lat]
  * @param {[number, number][]} coordinates - Route coordinates

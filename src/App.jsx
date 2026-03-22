@@ -2,9 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import Map from './components/Map.jsx';
 import SearchBar from './components/SearchBar.jsx';
 import NavigationPill from './components/NavigationPill.jsx';
-import AudioTest from './components/AudioTest.jsx';
+import AudioTestPanel from './components/AudioTestPanel.jsx';
 import { useNavigation } from './hooks/useNavigation.js';
-import { unlockAudio } from './lib/audio.js';
+import { initAudio, startMusic, stopMusic } from './lib/audio/index.js';
 import {
   isSpotifyConnected,
   initiateSpotifyAuth,
@@ -12,13 +12,10 @@ import {
   clearTokens
 } from './lib/spotify.js';
 
-// You'll need to provide your Mapbox token
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID || '';
 
 function App() {
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const [showAudioTest, setShowAudioTest] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(isSpotifyConnected());
 
   // Handle Spotify OAuth callback on mount
@@ -58,12 +55,12 @@ function App() {
     setDestinationAndFetchRoute,
     startNavigation,
     stopNavigation
-  } = useNavigation(MAPBOX_TOKEN);
+  } = useNavigation();
 
   // Handle first tap to unlock audio
   const handleFirstTap = useCallback(async () => {
     if (!audioUnlocked) {
-      await unlockAudio();
+      await initAudio();
       setAudioUnlocked(true);
     }
   }, [audioUnlocked]);
@@ -99,30 +96,19 @@ function App() {
   const handleStart = useCallback(async () => {
     await handleFirstTap();
     await startNavigation();
+    startMusic();
   }, [startNavigation, handleFirstTap]);
 
   // Handle stop
   const handleStop = useCallback(() => {
+    stopMusic();
     stopNavigation();
   }, [stopNavigation]);
 
-  // Check for missing token
-  if (!MAPBOX_TOKEN) {
-    return (
-      <div style={errorContainerStyle}>
-        <h1>Missing Mapbox Token</h1>
-        <p>Create a <code>.env</code> file in the project root with:</p>
-        <pre>VITE_MAPBOX_TOKEN=your_token_here</pre>
-        <p>Get a free token at <a href="https://mapbox.com">mapbox.com</a></p>
-      </div>
-    );
-  }
-
   return (
-    <div style={appStyle} onClick={handleFirstTap}>
+    <div style={appStyle} onTouchStart={handleFirstTap} onClick={handleFirstTap}>
       {/* Map */}
       <Map
-        mapboxToken={MAPBOX_TOKEN}
         position={position}
         destination={destination}
         routeCoordinates={route?.coordinates}
@@ -182,6 +168,9 @@ function App() {
         </button>
       )}
 
+      {/* Audio test panel — hidden during navigation */}
+      {!isNavigating && <AudioTestPanel />}
+
       {/* Navigation pill */}
       {isNavigating && currentInstruction && (
         <div style={pillContainerStyle}>
@@ -207,18 +196,7 @@ function App() {
             {spotifyConnected ? 'Spotify ✓' : 'Spotify'}
           </button>
         )}
-        <button
-          style={smallButtonStyle}
-          onClick={() => setShowAudioTest(true)}
-        >
-          Test Audio
-        </button>
       </div>
-
-      {/* Audio test panel */}
-      {showAudioTest && (
-        <AudioTest onClose={() => setShowAudioTest(false)} />
-      )}
     </div>
   );
 }
@@ -239,7 +217,7 @@ const searchContainerStyle = {
   right: '16px',
   display: 'flex',
   justifyContent: 'center',
-  zIndex: 10
+  zIndex: 1000
 };
 
 const startButtonStyle = {
@@ -256,7 +234,7 @@ const startButtonStyle = {
   borderRadius: '12px',
   boxShadow: '0 4px 16px rgba(59, 130, 246, 0.4)',
   cursor: 'pointer',
-  zIndex: 10
+  zIndex: 1000
 };
 
 const stopButtonStyle = {
@@ -271,7 +249,7 @@ const stopButtonStyle = {
   border: 'none',
   borderRadius: '8px',
   cursor: 'pointer',
-  zIndex: 10
+  zIndex: 1000
 };
 
 const pillContainerStyle = {
@@ -281,7 +259,7 @@ const pillContainerStyle = {
   right: '16px',
   display: 'flex',
   justifyContent: 'center',
-  zIndex: 10
+  zIndex: 1000
 };
 
 const errorBannerStyle = {
@@ -295,28 +273,17 @@ const errorBannerStyle = {
   borderRadius: '8px',
   fontSize: '14px',
   textAlign: 'center',
-  zIndex: 10
-};
-
-const errorContainerStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  height: '100vh',
-  padding: '20px',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  textAlign: 'center'
+  zIndex: 1000
 };
 
 const bottomRightContainerStyle = {
   position: 'absolute',
-  bottom: '40px',
+  bottom: '100px',
   right: '16px',
   display: 'flex',
   flexDirection: 'column',
   gap: '8px',
-  zIndex: 10
+  zIndex: 1000
 };
 
 const smallButtonStyle = {
@@ -341,7 +308,7 @@ const modeToggleContainerStyle = {
   borderRadius: '8px',
   boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
   overflow: 'hidden',
-  zIndex: 10
+  zIndex: 1000
 };
 
 const modeButtonStyle = {

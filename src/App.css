@@ -10,7 +10,14 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* Fix for mapbox-gl controls */
+/* Fix Leaflet container height */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Fix Mapbox GL controls z-index */
 .mapboxgl-ctrl-bottom-left,
 .mapboxgl-ctrl-bottom-right {
   z-index: 1;

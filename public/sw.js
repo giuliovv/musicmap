@@ -41,7 +41,7 @@ self.addEventListener('fetch', (event) => {
   if (
     url.hostname.includes('osrm') ||
     url.hostname.includes('nominatim') ||
-    url.hostname.includes('mapbox')
+    url.hostname.includes('openstreetmap')
   ) {
     return;
   }

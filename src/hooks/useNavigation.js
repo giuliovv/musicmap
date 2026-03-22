@@ -1,13 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { getRoute } from '../lib/routing.js';
-import { getDistance, watchPosition, clearWatch, requestCompassPermission, watchCompassHeading } from '../lib/geo.js';
-import { unlockAudio, playSpatialChime } from '../lib/audio.js';
+import { getDistance, watchPosition, clearWatch, requestCompassPermission, watchCompassHeading, calculateBearingDelta } from '../lib/geo.js';
+import { initAudio, updateNavigationParams, fadeOutMusic } from '../lib/audio/index.js';
 import { createSimulator } from '../lib/simulation.js';
 
-const GEOFENCE_RADIUS = 20; // meters
-const CHIME_COOLDOWN = 3000; // milliseconds between chimes for same step
-
-export function useNavigation(mapboxToken) {
+export function useNavigation() {
   const [position, setPosition] = useState(null);
   const [destination, setDestination] = useState(null);
   const [route, setRoute] = useState(null);
@@ -21,7 +18,6 @@ export function useNavigation(mapboxToken) {
   const watchIdRef = useRef(null);
   const compassCleanupRef = useRef(null);
   const simulatorRef = useRef(null);
-  const lastChimeTimeRef = useRef({});
   const initialPositionRequestedRef = useRef(false);
 
   // Request GPS position immediately on mount
@@ -119,8 +115,8 @@ export function useNavigation(mapboxToken) {
 
     setError(null);
 
-    // Unlock audio
-    await unlockAudio();
+    // Init audio engine
+    await initAudio();
 
     // Request compass permission (iOS)
     await requestCompassPermission();
@@ -201,7 +197,7 @@ export function useNavigation(mapboxToken) {
     setIsSimulation(false);
   }, []);
 
-  // Check geofence and play chimes
+  // Continuous sonification — update audio params on every position/heading change
   useEffect(() => {
     if (!isNavigating || !position || !route?.steps) return;
 
@@ -210,60 +206,43 @@ export function useNavigation(mapboxToken) {
 
     // Calculate distance to current step
     const stepLocation = currentStep.location;
-    const distance = getDistance(
+    const distanceToStep = getDistance(
       [position.lng, position.lat],
       stepLocation
     );
 
-    // Find distance to next step
+    // Find distance to next step (remote's improved step advancement)
     const nextStep = route.steps[currentStepIndex + 1];
     const nextDistance = nextStep
       ? getDistance([position.lng, position.lat], nextStep.location)
       : Infinity;
 
-    // Debug: log current step info
-    console.log(`Step ${currentStepIndex}: type=${currentStep.type}, modifier=${currentStep.modifier}, dist=${Math.round(distance)}m, nextDist=${Math.round(nextDistance)}m`);
-
     // Advance to next step if we're closer to it than current step
-    // This handles depart/continue/new name steps that we walk past
-    if (nextStep && nextDistance < distance && currentStepIndex < route.steps.length - 1) {
-      console.log(`Advancing to step ${currentStepIndex + 1} (closer to next: ${Math.round(nextDistance)}m < ${Math.round(distance)}m)`);
+    if (nextStep && nextDistance < distanceToStep && currentStepIndex < route.steps.length - 1) {
       setCurrentStepIndex(prev => prev + 1);
       return;
     }
 
-    // Skip chime logic for non-turn steps
-    if (currentStep.type === 'arrive' || currentStep.type === 'depart') return;
+    // Calculate remaining distance to destination
+    const lastStep = route.steps[route.steps.length - 1];
+    const distanceToDestination = lastStep
+      ? getDistance([position.lng, position.lat], lastStep.location)
+      : 0;
 
-    // Check if this is a turn we should chime for
-    const turnModifiers = ['left', 'right', 'slight left', 'slight right', 'sharp left', 'sharp right'];
-    const isTurn = turnModifiers.includes(currentStep.modifier);
+    // Bearing delta for spatial panning
+    const bearingDelta = calculateBearingDelta(heading, currentStep.bearing);
 
-    if (!isTurn) {
-      return;
-    }
-
-    // Check if we're within geofence
-    if (distance <= GEOFENCE_RADIUS) {
-      const now = Date.now();
-      const lastChime = lastChimeTimeRef.current[currentStepIndex] || 0;
-
-      // Play chime if cooldown has passed
-      if (now - lastChime >= CHIME_COOLDOWN) {
-        // Determine turn direction from modifier
-        let turnAngle = 0;
-        const mod = currentStep.modifier;
-        if (mod === 'left') turnAngle = -90;
-        else if (mod === 'slight left') turnAngle = -30;
-        else if (mod === 'sharp left') turnAngle = -135;
-        else if (mod === 'right') turnAngle = 90;
-        else if (mod === 'slight right') turnAngle = 30;
-        else if (mod === 'sharp right') turnAngle = 135;
-
-        console.log(`CHIME: ${mod} (${turnAngle}°) at ${Math.round(distance)}m`);
-        playSpatialChime(turnAngle);
-        lastChimeTimeRef.current[currentStepIndex] = now;
-      }
+    // Handle arrival
+    if (currentStep.type === 'arrive' && distanceToStep <= 15) {
+      fadeOutMusic();
+    } else if (currentStep.type !== 'depart') {
+      // Update sonification continuously (skip depart steps)
+      updateNavigationParams({
+        bearingDelta,
+        distanceToStep,
+        totalRouteDistance: route.distance || 1,
+        distanceToDestination
+      });
     }
   }, [isNavigating, position, heading, route, currentStepIndex]);
 
