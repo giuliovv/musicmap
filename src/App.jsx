@@ -1,17 +1,47 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Map from './components/Map.jsx';
 import SearchBar from './components/SearchBar.jsx';
 import NavigationPill from './components/NavigationPill.jsx';
 import AudioTest from './components/AudioTest.jsx';
 import { useNavigation } from './hooks/useNavigation.js';
 import { unlockAudio } from './lib/audio.js';
+import {
+  isSpotifyConnected,
+  initiateSpotifyAuth,
+  handleSpotifyCallback,
+  clearTokens
+} from './lib/spotify.js';
 
 // You'll need to provide your Mapbox token
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID || '';
 
 function App() {
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [showAudioTest, setShowAudioTest] = useState(false);
+  const [spotifyConnected, setSpotifyConnected] = useState(isSpotifyConnected());
+
+  // Handle Spotify OAuth callback on mount
+  useEffect(() => {
+    handleSpotifyCallback()
+      .then((handled) => {
+        if (handled) {
+          setSpotifyConnected(true);
+        }
+      })
+      .catch((err) => {
+        console.error('Spotify auth error:', err);
+      });
+  }, []);
+
+  const handleSpotifyConnect = useCallback(() => {
+    initiateSpotifyAuth();
+  }, []);
+
+  const handleSpotifyDisconnect = useCallback(() => {
+    clearTokens();
+    setSpotifyConnected(false);
+  }, []);
 
   const {
     position,
@@ -163,13 +193,27 @@ function App() {
         </div>
       )}
 
-      {/* Audio test button */}
-      <button
-        style={audioTestButtonStyle}
-        onClick={() => setShowAudioTest(true)}
-      >
-        Test Audio
-      </button>
+      {/* Bottom right buttons */}
+      <div style={bottomRightContainerStyle}>
+        {SPOTIFY_CLIENT_ID && (
+          <button
+            style={{
+              ...smallButtonStyle,
+              background: spotifyConnected ? '#1DB954' : 'white',
+              color: spotifyConnected ? 'white' : '#374151'
+            }}
+            onClick={spotifyConnected ? handleSpotifyDisconnect : handleSpotifyConnect}
+          >
+            {spotifyConnected ? 'Spotify ✓' : 'Spotify'}
+          </button>
+        )}
+        <button
+          style={smallButtonStyle}
+          onClick={() => setShowAudioTest(true)}
+        >
+          Test Audio
+        </button>
+      </div>
 
       {/* Audio test panel */}
       {showAudioTest && (
@@ -265,10 +309,17 @@ const errorContainerStyle = {
   textAlign: 'center'
 };
 
-const audioTestButtonStyle = {
+const bottomRightContainerStyle = {
   position: 'absolute',
   bottom: '40px',
   right: '16px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+  zIndex: 10
+};
+
+const smallButtonStyle = {
   padding: '10px 16px',
   fontSize: '13px',
   fontWeight: '500',
@@ -277,8 +328,7 @@ const audioTestButtonStyle = {
   border: 'none',
   borderRadius: '8px',
   boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-  cursor: 'pointer',
-  zIndex: 10
+  cursor: 'pointer'
 };
 
 const modeToggleContainerStyle = {

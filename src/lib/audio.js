@@ -1,7 +1,10 @@
 // Web Audio API module for spatial audio chimes
 
+import { isSpotifyConnected, pausePlayback, resumePlayback } from './spotify.js';
+
 let audioContext = null;
 let isUnlocked = false;
+let spotifyEnabled = true; // Can be toggled by user
 
 export function getAudioContext() {
   if (!audioContext) {
@@ -33,16 +36,34 @@ export function isAudioUnlocked() {
   return isUnlocked;
 }
 
+export function setSpotifyIntegration(enabled) {
+  spotifyEnabled = enabled;
+}
+
+export function isSpotifyIntegrationEnabled() {
+  return spotifyEnabled;
+}
+
 /**
  * Play a spatial chime from a specific direction
  * @param {number} bearingDelta - Angle in degrees relative to device heading
  *                                0 = ahead, 90 = right, -90 = left, 180 = behind
+ * @param {object} options - Options for playback
+ * @param {number} options.duration - Duration in seconds (default 0.4)
  */
-export function playSpatialChime(bearingDelta) {
+export async function playSpatialChime(bearingDelta, options = {}) {
   const ctx = getAudioContext();
   if (ctx.state === 'suspended') {
     console.warn('Audio context suspended, cannot play chime');
     return;
+  }
+
+  const duration = options.duration || 0.4;
+
+  // Pause Spotify if connected and enabled
+  const shouldHandleSpotify = spotifyEnabled && isSpotifyConnected();
+  if (shouldHandleSpotify) {
+    await pausePlayback();
   }
 
   const now = ctx.currentTime;
@@ -56,7 +77,7 @@ export function playSpatialChime(bearingDelta) {
   const gainNode = ctx.createGain();
   gainNode.gain.setValueAtTime(0, now);
   gainNode.gain.linearRampToValueAtTime(0.3, now + 0.05); // Attack
-  gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4); // Decay
+  gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration); // Decay
 
   // Create panner node with HRTF
   const panner = ctx.createPanner();
@@ -74,13 +95,13 @@ export function playSpatialChime(bearingDelta) {
   // In WebAudio: x = right, y = up, z = out of screen (towards listener)
   // Listener faces -z by default
   const angleRad = (bearingDelta * Math.PI) / 180;
-  const distance = 2; // Virtual distance for spatial effect
+  const dist = 2; // Virtual distance for spatial effect
 
   // Position the sound source
   // x: positive = right, negative = left
   // z: negative = in front, positive = behind
-  const x = Math.sin(angleRad) * distance;
-  const z = -Math.cos(angleRad) * distance;
+  const x = Math.sin(angleRad) * dist;
+  const z = -Math.cos(angleRad) * dist;
 
   panner.positionX.setValueAtTime(x, now);
   panner.positionY.setValueAtTime(0, now);
@@ -93,13 +114,20 @@ export function playSpatialChime(bearingDelta) {
 
   // Play the tone
   oscillator.start(now);
-  oscillator.stop(now + 0.4);
+  oscillator.stop(now + duration);
 
-  // Cleanup
+  // Cleanup and resume Spotify
   oscillator.onended = () => {
     oscillator.disconnect();
     gainNode.disconnect();
     panner.disconnect();
+
+    // Resume Spotify after a short delay
+    if (shouldHandleSpotify) {
+      setTimeout(() => {
+        resumePlayback();
+      }, 300);
+    }
   };
 }
 
