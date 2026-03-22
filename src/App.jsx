@@ -23,6 +23,8 @@ function App() {
     error,
     currentInstruction,
     currentDistance,
+    travelMode,
+    setTravelMode,
     setDestinationAndFetchRoute,
     startNavigation,
     stopNavigation
@@ -44,11 +46,24 @@ function App() {
         lat: result.lat,
         lng: result.lng,
         name: result.name
-      });
+      }, travelMode);
     } catch (e) {
       console.error('Failed to set destination:', e);
     }
-  }, [setDestinationAndFetchRoute, handleFirstTap]);
+  }, [setDestinationAndFetchRoute, handleFirstTap, travelMode]);
+
+  // Handle mode change
+  const handleModeChange = useCallback(async (mode) => {
+    setTravelMode(mode);
+    // Re-fetch route if we have a destination
+    if (destination) {
+      try {
+        await setDestinationAndFetchRoute(destination, mode);
+      } catch (e) {
+        console.error('Failed to update route:', e);
+      }
+    }
+  }, [destination, setDestinationAndFetchRoute, setTravelMode]);
 
   // Handle start button
   const handleStart = useCallback(async () => {
@@ -96,6 +111,30 @@ function App() {
       {error && (
         <div style={errorBannerStyle}>
           {error}
+        </div>
+      )}
+
+      {/* Mode toggle */}
+      {!isNavigating && (
+        <div style={modeToggleContainerStyle}>
+          <button
+            style={{
+              ...modeButtonStyle,
+              ...(travelMode === 'foot' ? modeButtonActiveStyle : {})
+            }}
+            onClick={() => handleModeChange('foot')}
+          >
+            Walk
+          </button>
+          <button
+            style={{
+              ...modeButtonStyle,
+              ...(travelMode === 'bike' ? modeButtonActiveStyle : {})
+            }}
+            onClick={() => handleModeChange('bike')}
+          >
+            Bike
+          </button>
         </div>
       )}
 
@@ -239,6 +278,35 @@ const audioTestButtonStyle = {
   boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
   cursor: 'pointer',
   zIndex: 10
+};
+
+const modeToggleContainerStyle = {
+  position: 'absolute',
+  top: '80px',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  display: 'flex',
+  background: 'white',
+  borderRadius: '8px',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+  overflow: 'hidden',
+  zIndex: 10
+};
+
+const modeButtonStyle = {
+  padding: '10px 20px',
+  fontSize: '14px',
+  fontWeight: '500',
+  color: '#6b7280',
+  background: 'white',
+  border: 'none',
+  cursor: 'pointer',
+  transition: 'all 0.15s'
+};
+
+const modeButtonActiveStyle = {
+  color: 'white',
+  background: '#3b82f6'
 };
 
 export default App;

@@ -2,12 +2,16 @@
 
 import { getDistance, getBearing } from './geo.js';
 
-const WALKING_SPEED = 1.4; // meters per second (~5 km/h)
+const SPEEDS = {
+  foot: 1.4,  // meters per second (~5 km/h)
+  bike: 5.5   // meters per second (~20 km/h)
+};
 const UPDATE_INTERVAL = 100; // milliseconds
 
 export class RouteSimulator {
-  constructor(coordinates) {
+  constructor(coordinates, mode = 'foot') {
     this.coordinates = coordinates;
+    this.speed = SPEEDS[mode] || SPEEDS.foot;
     this.currentIndex = 0;
     this.progress = 0; // Progress between current and next point (0-1)
     this.heading = 0;
@@ -90,7 +94,7 @@ export class RouteSimulator {
       lat,
       lng,
       heading: this.heading,
-      speed: WALKING_SPEED,
+      speed: this.speed,
       accuracy: 5
     };
   }
@@ -113,7 +117,7 @@ export class RouteSimulator {
     this.heading = getBearing(current, next);
 
     // Move along the segment
-    const distancePerUpdate = (WALKING_SPEED * UPDATE_INTERVAL) / 1000;
+    const distancePerUpdate = (this.speed * UPDATE_INTERVAL) / 1000;
     const progressIncrement = segmentDistance > 0 ? distancePerUpdate / segmentDistance : 1;
 
     this.progress += progressIncrement;
@@ -165,10 +169,11 @@ export class RouteSimulator {
 /**
  * Create a simulator if geolocation is unavailable
  * @param {[number, number][]} coordinates - Route coordinates
+ * @param {'foot' | 'bike'} mode - Travel mode
  * @returns {RouteSimulator}
  */
-export function createSimulator(coordinates) {
-  return new RouteSimulator(coordinates);
+export function createSimulator(coordinates, mode = 'foot') {
+  return new RouteSimulator(coordinates, mode);
 }
 
 /**

@@ -6,10 +6,12 @@ const OSRM_URL = 'https://router.project-osrm.org';
  * Get route from OSRM
  * @param {[number, number]} start - [lng, lat]
  * @param {[number, number]} end - [lng, lat]
+ * @param {'foot' | 'bike'} mode - Travel mode
  * @returns {Promise<{coordinates: [number, number][], steps: Step[]}>}
  */
-export async function getRoute(start, end) {
-  const url = `${OSRM_URL}/route/v1/foot/${start[0]},${start[1]};${end[0]},${end[1]}?overview=full&geometries=geojson&steps=true`;
+export async function getRoute(start, end, mode = 'foot') {
+  const profile = mode === 'bike' ? 'bike' : 'foot';
+  const url = `${OSRM_URL}/route/v1/${profile}/${start[0]},${start[1]};${end[0]},${end[1]}?overview=full&geometries=geojson&steps=true`;
 
   const response = await fetch(url);
   if (!response.ok) {

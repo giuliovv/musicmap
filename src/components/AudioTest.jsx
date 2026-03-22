@@ -71,15 +71,14 @@ export default function AudioTest({ onClose }) {
     };
   }, [frequency, duration, volume]);
 
+  // Only turn directions - no forward/back since those don't need audio cues
   const directions = [
-    { label: 'Front', angle: 0, emoji: '⬆️' },
-    { label: 'Front-Right', angle: 45, emoji: '↗️' },
-    { label: 'Right', angle: 90, emoji: '➡️' },
-    { label: 'Back-Right', angle: 135, emoji: '↘️' },
-    { label: 'Back', angle: 180, emoji: '⬇️' },
-    { label: 'Back-Left', angle: -135, emoji: '↙️' },
+    { label: 'Slight Left', angle: -30, emoji: '↖️' },
     { label: 'Left', angle: -90, emoji: '⬅️' },
-    { label: 'Front-Left', angle: -45, emoji: '↖️' },
+    { label: 'Sharp Left', angle: -135, emoji: '↙️' },
+    { label: 'Slight Right', angle: 30, emoji: '↗️' },
+    { label: 'Right', angle: 90, emoji: '➡️' },
+    { label: 'Sharp Right', angle: 135, emoji: '↘️' },
   ];
 
   return (
@@ -181,22 +180,28 @@ export default function AudioTest({ onClose }) {
             {/* Quick play */}
             <div style={sectionStyle}>
               <button
-                onClick={() => playTestChime(0)}
+                onClick={() => playTestChime(-90)}
                 style={playButtonStyle}
               >
-                Play Front
+                Left
+              </button>
+              <button
+                onClick={() => playTestChime(-30)}
+                style={{ ...playButtonStyle, marginLeft: 8 }}
+              >
+                Slight Left
+              </button>
+              <button
+                onClick={() => playTestChime(30)}
+                style={{ ...playButtonStyle, marginLeft: 8 }}
+              >
+                Slight Right
               </button>
               <button
                 onClick={() => playTestChime(90)}
                 style={{ ...playButtonStyle, marginLeft: 8 }}
               >
-                Play Right
-              </button>
-              <button
-                onClick={() => playTestChime(-90)}
-                style={{ ...playButtonStyle, marginLeft: 8 }}
-              >
-                Play Left
+                Right
               </button>
             </div>
           </>
@@ -273,7 +278,7 @@ const unlockButtonStyle = {
 
 const directionGridStyle = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(3, 1fr)',
+  gridTemplateColumns: 'repeat(2, 1fr)',
   gap: 8
 };
 

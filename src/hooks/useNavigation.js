@@ -16,6 +16,7 @@ export function useNavigation(mapboxToken) {
   const [isNavigating, setIsNavigating] = useState(false);
   const [isSimulation, setIsSimulation] = useState(false);
   const [error, setError] = useState(null);
+  const [travelMode, setTravelMode] = useState('foot'); // 'foot' or 'bike'
 
   const watchIdRef = useRef(null);
   const compassCleanupRef = useRef(null);
@@ -44,9 +45,11 @@ export function useNavigation(mapboxToken) {
   }, []);
 
   // Set destination and fetch route
-  const setDestinationAndFetchRoute = useCallback(async (dest) => {
+  const setDestinationAndFetchRoute = useCallback(async (dest, mode) => {
     setDestination(dest);
     setError(null);
+    if (mode) setTravelMode(mode);
+    const useMode = mode || travelMode;
 
     try {
       // Try to get current position
@@ -64,7 +67,8 @@ export function useNavigation(mapboxToken) {
       // Fetch route
       const routeData = await getRoute(
         [startPos.lng, startPos.lat],
-        [dest.lng, dest.lat]
+        [dest.lng, dest.lat],
+        useMode
       );
 
       setRoute(routeData);
@@ -75,7 +79,7 @@ export function useNavigation(mapboxToken) {
       setError(e.message);
       throw e;
     }
-  }, [getInitialPosition]);
+  }, [getInitialPosition, travelMode]);
 
   // Start navigation
   const startNavigation = useCallback(async () => {
@@ -136,7 +140,7 @@ export function useNavigation(mapboxToken) {
     if (!route?.coordinates) return;
 
     setIsSimulation(true);
-    simulatorRef.current = createSimulator(route.coordinates);
+    simulatorRef.current = createSimulator(route.coordinates, travelMode);
 
     simulatorRef.current.subscribe((pos) => {
       setPosition({ lat: pos.lat, lng: pos.lng });
@@ -144,7 +148,7 @@ export function useNavigation(mapboxToken) {
     });
 
     simulatorRef.current.start();
-  }, [route]);
+  }, [route, travelMode]);
 
   // Stop navigation
   const stopNavigation = useCallback(() => {
@@ -175,6 +179,12 @@ export function useNavigation(mapboxToken) {
     const currentStep = route.steps[currentStepIndex];
     if (!currentStep || currentStep.type === 'arrive') return;
 
+    // Skip chimes for "go straight" maneuvers - only play for actual turns
+    const skipTypes = ['depart', 'arrive', 'continue', 'new name'];
+    const skipModifiers = ['straight', undefined];
+    const isGoingStraight = skipTypes.includes(currentStep.type) ||
+                            skipModifiers.includes(currentStep.modifier);
+
     // Calculate distance to current step
     const stepLocation = currentStep.location;
     const distance = getDistance(
@@ -187,11 +197,17 @@ export function useNavigation(mapboxToken) {
       const now = Date.now();
       const lastChime = lastChimeTimeRef.current[currentStepIndex] || 0;
 
-      // Play chime if cooldown has passed
+      // Play chime if cooldown has passed AND it's an actual turn
       if (now - lastChime >= CHIME_COOLDOWN) {
         const bearingDelta = calculateBearingDelta(heading, currentStep.bearing);
-        playSpatialChime(bearingDelta);
-        lastChimeTimeRef.current[currentStepIndex] = now;
+
+        // Only play if it's a real turn (more than 20 degrees off straight)
+        const isActualTurn = Math.abs(bearingDelta) > 20;
+
+        if (!isGoingStraight && isActualTurn) {
+          playSpatialChime(bearingDelta);
+          lastChimeTimeRef.current[currentStepIndex] = now;
+        }
       }
     }
 
@@ -234,6 +250,8 @@ export function useNavigation(mapboxToken) {
     error,
     currentInstruction,
     currentDistance,
+    travelMode,
+    setTravelMode,
     setDestinationAndFetchRoute,
     startNavigation,
     stopNavigation,
