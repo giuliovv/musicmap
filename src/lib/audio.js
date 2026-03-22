@@ -59,10 +59,12 @@ export async function playSpatialChime(bearingDelta, options = {}) {
   }
 
   const duration = options.duration || 0.4;
+  console.log(`Playing spatial chime: ${bearingDelta}° for ${duration}s`);
 
   // Pause Spotify if connected and enabled
   const shouldHandleSpotify = spotifyEnabled && isSpotifyConnected();
   if (shouldHandleSpotify) {
+    console.log('Pausing Spotify before chime...');
     await pausePlayback();
   }
 
@@ -118,12 +120,14 @@ export async function playSpatialChime(bearingDelta, options = {}) {
 
   // Cleanup and resume Spotify
   oscillator.onended = () => {
+    console.log('Chime ended');
     oscillator.disconnect();
     gainNode.disconnect();
     panner.disconnect();
 
     // Resume Spotify after a short delay
     if (shouldHandleSpotify) {
+      console.log('Resuming Spotify...');
       setTimeout(() => {
         resumePlayback();
       }, 300);

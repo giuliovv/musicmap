@@ -6,6 +6,11 @@ const SPOTIFY_API_URL = 'https://api.spotify.com/v1';
 
 // Get client ID from environment
 const getClientId = () => import.meta.env.VITE_SPOTIFY_CLIENT_ID || '';
+const getRedirectUri = () => {
+  const configured = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+  if (configured && configured.trim()) return configured.trim();
+  return `${window.location.origin}/`;
+};
 
 // PKCE helpers
 function generateRandomString(length) {
@@ -75,7 +80,7 @@ export async function initiateSpotifyAuth() {
   const hashed = await sha256(codeVerifier);
   const codeChallenge = base64urlencode(hashed);
 
-  const redirectUri = window.location.origin + window.location.pathname;
+  const redirectUri = getRedirectUri();
   const scope = 'user-modify-playback-state user-read-playback-state';
 
   const params = new URLSearchParams({
@@ -109,7 +114,7 @@ export async function handleSpotifyCallback() {
   }
 
   const clientId = getClientId();
-  const redirectUri = window.location.origin + window.location.pathname;
+  const redirectUri = getRedirectUri();
 
   const response = await fetch(SPOTIFY_TOKEN_URL, {
     method: 'POST',
@@ -211,21 +216,35 @@ export async function getPlaybackState() {
 
 export async function pausePlayback() {
   const token = await getValidToken();
-  if (!token) return false;
+  if (!token) {
+    console.log('Spotify: No valid token');
+    return false;
+  }
 
   try {
     // Check if currently playing
     const state = await getPlaybackState();
+    console.log('Spotify playback state:', state);
     wasPlaying = state?.isPlaying || false;
 
-    if (!wasPlaying) return true; // Nothing to pause
+    if (!wasPlaying) {
+      console.log('Spotify: Not playing, nothing to pause');
+      return true;
+    }
 
+    console.log('Spotify: Pausing playback...');
     const response = await fetch(`${SPOTIFY_API_URL}/me/player/pause`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    return response.ok || response.status === 204;
+    if (!response.ok && response.status !== 204) {
+      const text = await response.text();
+      console.error('Spotify pause failed:', response.status, text);
+      return false;
+    }
+    console.log('Spotify: Paused successfully');
+    return true;
   } catch (e) {
     console.error('Failed to pause playback:', e);
     return false;

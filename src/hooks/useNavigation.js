@@ -95,6 +95,11 @@ export function useNavigation(mapboxToken) {
         useMode
       );
 
+      // Log route steps for debugging
+      console.log('Route steps:', routeData.steps.map((s, i) =>
+        `${i}: ${s.type} ${s.modifier || ''} - ${s.instruction}`
+      ));
+
       setRoute(routeData);
       setCurrentStepIndex(0);
 
@@ -201,14 +206,7 @@ export function useNavigation(mapboxToken) {
     if (!isNavigating || !position || !route?.steps) return;
 
     const currentStep = route.steps[currentStepIndex];
-    if (!currentStep || currentStep.type === 'arrive') return;
-
-    // Only play chimes for actual turns based on modifier
-    const turnModifiers = ['left', 'right', 'slight left', 'slight right', 'sharp left', 'sharp right'];
-    const isTurn = turnModifiers.includes(currentStep.modifier) ||
-                   (currentStep.type === 'turn' && currentStep.modifier);
-
-    if (!isTurn) return;
+    if (!currentStep) return;
 
     // Calculate distance to current step
     const stepLocation = currentStep.location;
@@ -216,6 +214,34 @@ export function useNavigation(mapboxToken) {
       [position.lng, position.lat],
       stepLocation
     );
+
+    // Find distance to next step
+    const nextStep = route.steps[currentStepIndex + 1];
+    const nextDistance = nextStep
+      ? getDistance([position.lng, position.lat], nextStep.location)
+      : Infinity;
+
+    // Debug: log current step info
+    console.log(`Step ${currentStepIndex}: type=${currentStep.type}, modifier=${currentStep.modifier}, dist=${Math.round(distance)}m, nextDist=${Math.round(nextDistance)}m`);
+
+    // Advance to next step if we're closer to it than current step
+    // This handles depart/continue/new name steps that we walk past
+    if (nextStep && nextDistance < distance && currentStepIndex < route.steps.length - 1) {
+      console.log(`Advancing to step ${currentStepIndex + 1} (closer to next: ${Math.round(nextDistance)}m < ${Math.round(distance)}m)`);
+      setCurrentStepIndex(prev => prev + 1);
+      return;
+    }
+
+    // Skip chime logic for non-turn steps
+    if (currentStep.type === 'arrive' || currentStep.type === 'depart') return;
+
+    // Check if this is a turn we should chime for
+    const turnModifiers = ['left', 'right', 'slight left', 'slight right', 'sharp left', 'sharp right'];
+    const isTurn = turnModifiers.includes(currentStep.modifier);
+
+    if (!isTurn) {
+      return;
+    }
 
     // Check if we're within geofence
     if (distance <= GEOFENCE_RADIUS) {
@@ -234,26 +260,9 @@ export function useNavigation(mapboxToken) {
         else if (mod === 'slight right') turnAngle = 30;
         else if (mod === 'sharp right') turnAngle = 135;
 
-        if (turnAngle !== 0) {
-          console.log(`Playing chime: ${mod} (${turnAngle}°) at ${Math.round(distance)}m`);
-          playSpatialChime(turnAngle);
-          lastChimeTimeRef.current[currentStepIndex] = now;
-        }
-      }
-    }
-
-    // Check if we've passed the turn (moved beyond it)
-    if (distance <= 10 && currentStepIndex < route.steps.length - 1) {
-      // Check if we're closer to next step
-      const nextStep = route.steps[currentStepIndex + 1];
-      if (nextStep) {
-        const nextDistance = getDistance(
-          [position.lng, position.lat],
-          nextStep.location
-        );
-        if (nextDistance < distance) {
-          setCurrentStepIndex(prev => prev + 1);
-        }
+        console.log(`CHIME: ${mod} (${turnAngle}°) at ${Math.round(distance)}m`);
+        playSpatialChime(turnAngle);
+        lastChimeTimeRef.current[currentStepIndex] = now;
       }
     }
   }, [isNavigating, position, heading, route, currentStepIndex]);
