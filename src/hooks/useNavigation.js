@@ -22,6 +22,30 @@ export function useNavigation(mapboxToken) {
   const compassCleanupRef = useRef(null);
   const simulatorRef = useRef(null);
   const lastChimeTimeRef = useRef({});
+  const initialPositionRequestedRef = useRef(false);
+
+  // Request GPS position immediately on mount
+  useEffect(() => {
+    if (initialPositionRequestedRef.current) return;
+    initialPositionRequestedRef.current = true;
+
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setPosition({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        });
+      },
+      (err) => {
+        console.log('Initial position request denied or failed:', err.message);
+        // Use default position (London) if denied
+        setPosition({ lat: 51.509865, lng: -0.118092 });
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
 
   // Get initial position
   const getInitialPosition = useCallback(() => {
