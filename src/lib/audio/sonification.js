@@ -1,6 +1,7 @@
 // Sonification — maps navigation state to audio parameters
 
-const PROXIMITY_RANGE = 100; // meters — start affecting audio within this range of a turn
+const PROXIMITY_RANGE = 50; // meters — start affecting audio within this range of a turn
+const CHIME_RANGE = 30; // meters — music fades in within this range
 
 function clamp(val, min, max) {
   return Math.max(min, Math.min(max, val));
@@ -53,6 +54,11 @@ export function computeSonificationParams(state, genre) {
   // Master filter: opens up as destination approaches
   const masterFilterCutoff = lerp(400, 8000, destinationProgress);
 
+  // Volume: only play when near a turn (within CHIME_RANGE)
+  // This makes the music act like "chimes" - silent when far, audible when near turns
+  const chimeProximity = clamp(1 - (distanceToStep / CHIME_RANGE), 0, 1);
+  const volume = chimeProximity; // 0 = silent, 1 = full volume
+
   return {
     panX,
     panZ,
@@ -61,6 +67,7 @@ export function computeSonificationParams(state, genre) {
     filterCutoff,
     tension,
     destinationProgress,
-    masterFilterCutoff
+    masterFilterCutoff,
+    volume
   };
 }

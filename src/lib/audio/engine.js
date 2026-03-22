@@ -174,6 +174,9 @@ export class SonicEngine {
   start() {
     if (this.isPlaying || !this.genre) return;
 
+    // Start silent — volume will fade in when approaching turns
+    this.masterGain.gain.value = 0;
+
     this.leadSequence?.start(0);
     this.padSequence?.start(0);
     this.rhythmSequence?.start(0);
@@ -205,11 +208,19 @@ export class SonicEngine {
    * @param {number} params.filterCutoff - Lead filter cutoff Hz
    * @param {number} params.tension - 0-1 tension level
    * @param {number} params.masterFilterCutoff - Master filter cutoff Hz
+   * @param {number} params.volume - 0-1 master volume (for chime-like behavior)
    */
   updateSonification(params) {
     if (!this.isPlaying || !this.genre) return;
 
     const now = Tone.now();
+
+    // Volume control — fade in/out based on proximity to turns
+    // This makes music act like "chimes" - silent when far, audible when near
+    if (this.masterGain && params.volume !== undefined) {
+      const targetVolume = params.volume * (this.genre.levels?.master ?? 0.7);
+      this.masterGain.gain.rampTo(targetVolume, 0.3, now);
+    }
 
     // Spatial panning — smooth ramp
     if (this.leadPanner && params.panX !== undefined) {
