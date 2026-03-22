@@ -129,6 +129,7 @@ function App() {
           <button
             style={{
               ...modeButtonStyle,
+              borderBottom: 'none',
               ...(travelMode === 'bike' ? modeButtonActiveStyle : {})
             }}
             onClick={() => handleModeChange('bike')}
@@ -282,10 +283,10 @@ const audioTestButtonStyle = {
 
 const modeToggleContainerStyle = {
   position: 'absolute',
-  top: '80px',
-  left: '50%',
-  transform: 'translateX(-50%)',
+  bottom: '100px',
+  left: '16px',
   display: 'flex',
+  flexDirection: 'column',
   background: 'white',
   borderRadius: '8px',
   boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
@@ -294,12 +295,13 @@ const modeToggleContainerStyle = {
 };
 
 const modeButtonStyle = {
-  padding: '10px 20px',
-  fontSize: '14px',
+  padding: '12px 16px',
+  fontSize: '13px',
   fontWeight: '500',
   color: '#6b7280',
   background: 'white',
   border: 'none',
+  borderBottom: '1px solid #e5e7eb',
   cursor: 'pointer',
   transition: 'all 0.15s'
 };

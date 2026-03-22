@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { getRoute } from '../lib/routing.js';
 import { getDistance, watchPosition, clearWatch, requestCompassPermission, watchCompassHeading } from '../lib/geo.js';
-import { unlockAudio, playSpatialChime, calculateBearingDelta } from '../lib/audio.js';
+import { unlockAudio, playSpatialChime } from '../lib/audio.js';
 import { createSimulator } from '../lib/simulation.js';
 
 const GEOFENCE_RADIUS = 20; // meters
@@ -179,11 +179,12 @@ export function useNavigation(mapboxToken) {
     const currentStep = route.steps[currentStepIndex];
     if (!currentStep || currentStep.type === 'arrive') return;
 
-    // Skip chimes for "go straight" maneuvers - only play for actual turns
-    const skipTypes = ['depart', 'arrive', 'continue', 'new name'];
-    const skipModifiers = ['straight', undefined];
-    const isGoingStraight = skipTypes.includes(currentStep.type) ||
-                            skipModifiers.includes(currentStep.modifier);
+    // Only play chimes for actual turns based on modifier
+    const turnModifiers = ['left', 'right', 'slight left', 'slight right', 'sharp left', 'sharp right'];
+    const isTurn = turnModifiers.includes(currentStep.modifier) ||
+                   (currentStep.type === 'turn' && currentStep.modifier);
+
+    if (!isTurn) return;
 
     // Calculate distance to current step
     const stepLocation = currentStep.location;
@@ -197,15 +198,21 @@ export function useNavigation(mapboxToken) {
       const now = Date.now();
       const lastChime = lastChimeTimeRef.current[currentStepIndex] || 0;
 
-      // Play chime if cooldown has passed AND it's an actual turn
+      // Play chime if cooldown has passed
       if (now - lastChime >= CHIME_COOLDOWN) {
-        const bearingDelta = calculateBearingDelta(heading, currentStep.bearing);
+        // Determine turn direction from modifier
+        let turnAngle = 0;
+        const mod = currentStep.modifier;
+        if (mod === 'left') turnAngle = -90;
+        else if (mod === 'slight left') turnAngle = -30;
+        else if (mod === 'sharp left') turnAngle = -135;
+        else if (mod === 'right') turnAngle = 90;
+        else if (mod === 'slight right') turnAngle = 30;
+        else if (mod === 'sharp right') turnAngle = 135;
 
-        // Only play if it's a real turn (more than 20 degrees off straight)
-        const isActualTurn = Math.abs(bearingDelta) > 20;
-
-        if (!isGoingStraight && isActualTurn) {
-          playSpatialChime(bearingDelta);
+        if (turnAngle !== 0) {
+          console.log(`Playing chime: ${mod} (${turnAngle}°) at ${Math.round(distance)}m`);
+          playSpatialChime(turnAngle);
           lastChimeTimeRef.current[currentStepIndex] = now;
         }
       }
