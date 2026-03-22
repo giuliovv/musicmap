@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import Map from './components/Map.jsx';
 import SearchBar from './components/SearchBar.jsx';
 import NavigationPill from './components/NavigationPill.jsx';
+import AudioTest from './components/AudioTest.jsx';
 import { useNavigation } from './hooks/useNavigation.js';
 import { unlockAudio } from './lib/audio.js';
 
@@ -10,6 +11,7 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 function App() {
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [showAudioTest, setShowAudioTest] = useState(false);
 
   const {
     position,
@@ -120,6 +122,19 @@ function App() {
           />
         </div>
       )}
+
+      {/* Audio test button */}
+      <button
+        style={audioTestButtonStyle}
+        onClick={() => setShowAudioTest(true)}
+      >
+        Test Audio
+      </button>
+
+      {/* Audio test panel */}
+      {showAudioTest && (
+        <AudioTest onClose={() => setShowAudioTest(false)} />
+      )}
     </div>
   );
 }
@@ -208,6 +223,22 @@ const errorContainerStyle = {
   padding: '20px',
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   textAlign: 'center'
+};
+
+const audioTestButtonStyle = {
+  position: 'absolute',
+  bottom: '40px',
+  right: '16px',
+  padding: '10px 16px',
+  fontSize: '13px',
+  fontWeight: '500',
+  color: '#374151',
+  background: 'white',
+  border: 'none',
+  borderRadius: '8px',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+  cursor: 'pointer',
+  zIndex: 10
 };
 
 export default App;
